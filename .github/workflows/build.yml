@@ -1,0 +1,41 @@
+name: APK Derle
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip dosyasini ac
+        run: |
+          mkdir -p build_src
+          unzip -q "$(ls *.zip | head -1)" -d build_src
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: APK derle
+        working-directory: build_src
+        run: |
+          set +e
+          gradle assembleDebug --no-daemon --console=plain > build.log 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            echo '### HATA OZETI' >> $GITHUB_STEP_SUMMARY
+            echo '~~~' >> $GITHUB_STEP_SUMMARY
+            grep -E '^e: ' build.log | sed 's#file:///.*/com/yanki/player/##' | head -30 >> $GITHUB_STEP_SUMMARY
+            grep -A6 'What went wrong' build.log | head -12 >> $GITHUB_STEP_SUMMARY
+            echo '~~~' >> $GITHUB_STEP_SUMMARY
+          fi
+          exit $code
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Yanki-APK
+          path: build_src/app/build/outputs/apk/debug/*.apk
